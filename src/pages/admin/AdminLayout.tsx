@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  ClipboardCheck, 
+import {
+  LayoutDashboard,
+  Users,
+  ClipboardCheck,
   UserX,
-  FileText, 
-  CreditCard, 
-  DollarSign, 
+  FileText,
+  CreditCard,
+  DollarSign,
   BookOpen,
   LogOut,
   Menu,
-  X
+  X,
+  KeyRound
 } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
 
@@ -35,6 +36,7 @@ export default function AdminLayout() {
     { path: '/admin/pagamentos', icon: <CreditCard size={20} />, label: 'Formas de Pagamento' },
     ...(user?.role === 'admin' ? [{ path: '/admin/financeiro', icon: <DollarSign size={20} />, label: 'Financeiro' }] : []),
     { path: '/admin/temas', icon: <BookOpen size={20} />, label: 'Temas' },
+    ...(user?.role === 'admin' ? [{ path: '/admin/conta', icon: <KeyRound size={20} />, label: 'Minha Conta' }] : []),
   ];
 
   return (
@@ -42,7 +44,7 @@ export default function AdminLayout() {
       {/* Mobile Header */}
       <div className="md:hidden bg-[#1e3a8a] text-white p-4 flex justify-between items-center z-20">
         <h1 className="text-xl font-bold tracking-wider">PROFOLI</h1>
-        <button 
+        <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="p-2 focus:outline-none"
         >
@@ -65,7 +67,7 @@ export default function AdminLayout() {
             {user?.role === 'admin' ? 'Mestre' : 'Padrão'}
           </div>
         </div>
-        
+
         <div className="md:hidden p-4 border-b border-blue-800 flex items-center justify-between mt-16">
           <span className="text-blue-200 text-sm">Logado como:</span>
           <div className="bg-blue-800 px-3 py-1 rounded-full text-xs font-medium">
@@ -79,11 +81,10 @@ export default function AdminLayout() {
               key={item.path}
               to={item.path}
               onClick={() => setIsMobileMenuOpen(false)}
-              className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                location.pathname === item.path 
-                  ? 'bg-blue-800 text-white' 
+              className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${location.pathname === item.path
+                  ? 'bg-blue-800 text-white'
                   : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'
-              }`}
+                }`}
             >
               {item.icon}
               <span className="font-medium">{item.label}</span>
@@ -92,7 +93,7 @@ export default function AdminLayout() {
         </nav>
 
         <div className="p-4 border-t border-blue-800">
-          <button 
+          <button
             onClick={handleLogout}
             className="flex items-center space-x-3 px-4 py-3 w-full text-left text-blue-200 hover:bg-red-600 hover:text-white rounded-lg transition-colors"
           >
@@ -104,7 +105,7 @@ export default function AdminLayout() {
 
       {/* Overlay for mobile sidebar */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-0 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -120,7 +121,7 @@ export default function AdminLayout() {
             <span className="text-sm text-gray-500 hidden sm:inline">Olá, <strong className="text-gray-900">{user?.username}</strong></span>
           </div>
         </header>
-        
+
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <Outlet />
         </div>

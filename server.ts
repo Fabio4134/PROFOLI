@@ -36,18 +36,50 @@ const upload = multer({ storage: storage })
 // Auth
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
+  const trimmedUsername = username?.trim();
+  const trimmedPassword = password?.trim();
+
+  console.log(`[AUTH] Login attempt for user: "${trimmedUsername}" (pwd length: ${trimmedPassword?.length || 0})`);
+
   const { data: user, error } = await supabase
     .from('users')
     .select('id, username, role')
-    .eq('username', username)
-    .eq('password', password)
+    .eq('username', trimmedUsername)
+    .eq('password', trimmedPassword)
     .single();
 
   if (user) {
+    console.log(`[AUTH] Success: ${trimmedUsername}`);
     res.json(user);
   } else {
+    console.log(`[AUTH] Failure for ${trimmedUsername}: ${error?.message || 'Invalid credentials'}`);
     res.status(401).json({ error: 'Invalid credentials' });
   }
+});
+
+// Update user credentials
+app.put('/api/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const { username, password, currentPassword } = req.body;
+
+  // Verify current password first
+  const { data: existing } = await supabase
+    .from('users')
+    .select('password')
+    .eq('id', id)
+    .single();
+
+  if (!existing || existing.password !== currentPassword) {
+    return res.status(401).json({ error: 'Senha atual incorreta.' });
+  }
+
+  const updates: any = {};
+  if (username) updates.username = username;
+  if (password) updates.password = password;
+
+  const { error } = await supabase.from('users').update(updates).eq('id', id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
 });
 
 // Attendees
@@ -59,9 +91,22 @@ app.get('/api/attendees', async (req, res) => {
 
 app.post('/api/attendees', async (req, res) => {
   const { name, cpf, roles, church, phone } = req.body;
+  const cpfDigits = cpf.replace(/\D/g, '');
+
+  // Check for duplicate CPF
+  const { data: existing } = await supabase
+    .from('attendees')
+    .select('id')
+    .eq('cpf', cpfDigits)
+    .single();
+
+  if (existing) {
+    return res.status(400).json({ error: 'Este CPF já está cadastrado no sistema.' });
+  }
+
   const { data, error } = await supabase
     .from('attendees')
-    .insert([{ name, cpf, roles: JSON.stringify(roles), church, phone }])
+    .insert([{ name, cpf: cpfDigits, roles: JSON.stringify(roles), church, phone }])
     .select('id')
     .single();
 
@@ -72,9 +117,22 @@ app.post('/api/attendees', async (req, res) => {
 app.put('/api/attendees/:id', async (req, res) => {
   const { name, cpf, roles, church, phone, status, payment_status } = req.body;
   const { id } = req.params;
+  const cpfDigits = cpf ? cpf.replace(/\D/g, '') : undefined;
+
+  if (cpfDigits) {
+    // Check if another attendee has this CPF
+    const { data: existing } = await supabase
+      .from('attendees')
+      .select('id')
+      .eq('cpf', cpfDigits)
+      .neq('id', id)
+      .single();
+    if (existing) return res.status(400).json({ error: 'Este CPF já pertence a outro inscrito.' });
+  }
+
   const { error } = await supabase
     .from('attendees')
-    .update({ name, cpf, roles: JSON.stringify(roles), church, phone, status, payment_status })
+    .update({ name, cpf: cpfDigits, roles: JSON.stringify(roles), church, phone, status, payment_status })
     .eq('id', id);
 
   if (error) return res.status(400).json({ error: error.message });
@@ -93,11 +151,26 @@ app.delete('/api/attendees/:id', async (req, res) => {
 // Public Attendee Status by CPF
 app.get('/api/public/status/:cpf', async (req, res) => {
   const { cpf } = req.params;
-  const { data: attendee, error } = await supabase
+  // Normalize: strip all non-digit characters for comparison
+  const cpfDigits = cpf.replace(/\D/g, '');
+
+  // Try exact match first, then digits-only match
+  let { data: attendee } = await supabase
     .from('attendees')
     .select('id, name, cpf, payment_status')
     .eq('cpf', cpf)
     .single();
+
+  if (!attendee) {
+    // Try matching by digits stripped from stored CPF using ilike fallback
+    const { data: all } = await supabase
+      .from('attendees')
+      .select('id, name, cpf, payment_status');
+
+    if (all) {
+      attendee = all.find((a: any) => a.cpf.replace(/\D/g, '') === cpfDigits) || null;
+    }
+  }
 
   if (attendee) {
     res.json(attendee);
@@ -244,32 +317,67 @@ app.get('/api/themes', async (req, res) => {
   res.json(data);
 });
 
-app.post('/api/themes', upload.single('file'), async (req, res) => {
-  const { title, speaker, event_date, file_type, file_url } = req.body;
+app.post('/api/themes', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), async (req, res) => {
+  const { title, speaker, event_date } = req.body;
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+  const uploadedFile = files?.['file']?.[0];
+  const coverFile = files?.['cover']?.[0];
 
-  const { data, error } = await supabase
+  if (!uploadedFile) return res.status(400).json({ error: 'Arquivo principal obrigatório.' });
+
+  const detectedType = uploadedFile.mimetype || 'application/octet-stream';
+
+  const insertData: any = {
+    title,
+    speaker: speaker || null,
+    event_date: event_date || null,
+    file_type: detectedType,
+    file_url: `/uploads/${uploadedFile.filename}`,
+  };
+  if (coverFile) insertData.cover_image_url = `/uploads/${coverFile.filename}`;
+
+  let { data, error } = await supabase
     .from('themes')
-    .insert([{
-      title,
-      speaker,
-      event_date,
-      file_type,
-      file_url: req.file ? `/uploads/${req.file.filename}` : file_url
-    }])
+    .insert([insertData])
     .select('id')
     .single();
 
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ id: data.id });
+  // Fallback: if cover_image_url column doesn't exist yet, retry without it
+  if (error && insertData.cover_image_url) {
+    console.warn('cover_image_url column may not exist, retrying without it:', error.message);
+    const fallbackData = { ...insertData };
+    delete fallbackData.cover_image_url;
+    const retry = await supabase.from('themes').insert([fallbackData]).select('id').single();
+    data = retry.data;
+    error = retry.error;
+  }
+
+  if (error) {
+    console.error('THEME INSERT ERROR:', JSON.stringify(error));
+    return res.status(400).json({ error: error.message, details: error });
+  }
+  res.json({ id: data!.id });
 });
 
-app.put('/api/themes/:id', async (req, res) => {
-  const { title, speaker, event_date, file_type, file_url } = req.body;
+app.put('/api/themes/:id', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), async (req, res) => {
+  const { title, speaker, event_date, file_url } = req.body;
   const { id } = req.params;
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+  const uploadedFile = files?.['file']?.[0];
+  const coverFile = files?.['cover']?.[0];
+
+  const updateData: any = { title, speaker: speaker || null, event_date: event_date || null };
+  if (uploadedFile) {
+    updateData.file_url = `/uploads/${uploadedFile.filename}`;
+    updateData.file_type = uploadedFile.mimetype;
+  } else if (file_url) {
+    updateData.file_url = file_url;
+  }
+  if (coverFile) updateData.cover_image_url = `/uploads/${coverFile.filename}`;
 
   const { error } = await supabase
     .from('themes')
-    .update({ title, speaker, event_date, file_type, file_url })
+    .update(updateData)
     .eq('id', id);
 
   if (error) return res.status(400).json({ error: error.message });

@@ -14,19 +14,20 @@ import Relatorios from './pages/admin/Relatorios';
 import FormasPagamento from './pages/admin/FormasPagamento';
 import Financeiro from './pages/admin/Financeiro';
 import Temas from './pages/admin/Temas';
+import Conta from './pages/admin/Conta';
 import { useAuthStore } from './store/auth';
 
 const ProtectedRoute = ({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) => {
   const user = useAuthStore((state) => state.user);
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   if (requireAdmin && user.role !== 'admin') {
     return <Navigate to="/admin" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
@@ -39,7 +40,7 @@ export default function App() {
         <Route path="/status" element={<PublicStatus />} />
         <Route path="/apostilas" element={<PublicApostilas />} />
         <Route path="/login" element={<LoginPage />} />
-        
+
         <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="inscritos" element={<Inscritos />} />
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="pagamentos" element={<FormasPagamento />} />
           <Route path="financeiro" element={<ProtectedRoute requireAdmin><Financeiro /></ProtectedRoute>} />
           <Route path="temas" element={<Temas />} />
+          <Route path="conta" element={<ProtectedRoute requireAdmin><Conta /></ProtectedRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -25,7 +25,7 @@ export default function PublicPage() {
   const handleRoleChange = (role: string) => {
     setFormData(prev => ({
       ...prev,
-      roles: prev.roles.includes(role) 
+      roles: prev.roles.includes(role)
         ? prev.roles.filter(r => r !== role)
         : [...prev.roles, role]
     }));
@@ -39,11 +39,12 @@ export default function PublicPage() {
     }
     setLoading(true);
     try {
-      await api.post('/attendees', formData);
+      await api.post('/attendees', { ...formData, cpf: formData.cpf.replace(/\D/g, '') });
       setSuccess(true);
       setFormData({ name: '', cpf: '', roles: [], church: '', phone: '' });
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Erro ao realizar cadastro.');
+      const message = error.response?.data?.error || 'Erro ao realizar cadastro. Verifique os dados e tente novamente.';
+      alert(message);
     } finally {
       setLoading(false);
     }
@@ -59,17 +60,17 @@ export default function PublicPage() {
               {/* Book Base */}
               <path d="M60 220 Q 200 260 340 220 L 340 250 Q 200 290 60 250 Z" fill="#0f204b" />
               <path d="M50 200 Q 200 240 350 200 L 330 180 Q 200 220 70 180 Z" fill="#1e3a8a" />
-              
+
               {/* People */}
               <circle cx="160" cy="130" r="15" fill="#0f204b" />
               <path d="M140 180 Q 160 150 180 180 Z" fill="#0f204b" />
-              
+
               <circle cx="240" cy="130" r="15" fill="#0f204b" />
               <path d="M220 180 Q 240 150 260 180 Z" fill="#0f204b" />
-              
+
               <circle cx="200" cy="100" r="20" fill="#f59e0b" />
               <path d="M175 180 Q 200 130 225 180 Z" fill="#f59e0b" />
-              
+
               {/* Arrow */}
               <path d="M120 210 Q 250 240 300 120" fill="none" stroke="#f59e0b" strokeWidth="20" strokeLinecap="round" />
               <polygon points="280,130 320,100 320,150" fill="#f59e0b" />
@@ -124,7 +125,7 @@ export default function PublicPage() {
             <Users size={20} />
             <h3 className="font-semibold text-lg">Formulário de Inscrição</h3>
           </div>
-          
+
           <div className="p-4 md:p-6">
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6 flex items-center space-x-3">
               <span className="text-2xl">💰</span>
@@ -136,13 +137,13 @@ export default function PublicPage() {
                 <h4 className="text-xl font-bold mb-2">Inscrição realizada com sucesso!</h4>
                 <p className="text-sm md:text-base mb-4">Caso não possa efetuar o pagamento no momento da inscrição, Não se preocupe, procure um dos responsáveis e negocie modalidade e prazo.</p>
                 <div className="flex flex-col sm:flex-row justify-center gap-3">
-                  <Link 
-                    to="/pagamentos" 
+                  <Link
+                    to="/pagamentos"
                     className="bg-[#1e3a8a] text-white px-6 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium"
                   >
                     Ver Formas de Pagamento
                   </Link>
-                  <button 
+                  <button
                     onClick={() => setSuccess(false)}
                     className="bg-white border border-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
                   >
@@ -154,24 +155,24 @@ export default function PublicPage() {
               <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo *</label>
-                  <input 
-                    type="text" 
-                    required 
+                  <input
+                    type="text"
+                    required
                     className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
                     value={formData.name}
-                    onChange={e => setFormData({...formData, name: e.target.value})}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">CPF *</label>
-                  <input 
-                    type="text" 
-                    required 
+                  <input
+                    type="text"
+                    required
                     placeholder="000.000.000-00"
                     className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
                     value={formData.cpf}
-                    onChange={e => setFormData({...formData, cpf: e.target.value})}
+                    onChange={e => setFormData({ ...formData, cpf: e.target.value })}
                   />
                 </div>
 
@@ -180,8 +181,8 @@ export default function PublicPage() {
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
                     {ROLES.map(role => (
                       <label key={role} className="flex items-center space-x-3 cursor-pointer p-1 hover:bg-gray-100 rounded transition-colors">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
                           checked={formData.roles.includes(role)}
                           onChange={() => handleRoleChange(role)}
@@ -195,11 +196,11 @@ export default function PublicPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Igreja *</label>
-                    <select 
+                    <select
                       required
                       className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white transition-shadow"
                       value={formData.church}
-                      onChange={e => setFormData({...formData, church: e.target.value})}
+                      onChange={e => setFormData({ ...formData, church: e.target.value })}
                     >
                       <option value="">Selecione sua igreja</option>
                       {CHURCHES.map(church => (
@@ -210,18 +211,18 @@ export default function PublicPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                    <input 
-                      type="tel" 
+                    <input
+                      type="tel"
                       placeholder="(00) 00000-0000"
                       className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
                       value={formData.phone}
-                      onChange={e => setFormData({...formData, phone: e.target.value})}
+                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
                 </div>
 
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={loading}
                   className="w-full bg-[#1e3a8a] text-white py-3.5 rounded-lg font-medium hover:bg-blue-800 transition-colors flex justify-center items-center space-x-2 disabled:opacity-70 mt-4 shadow-sm"
                 >

@@ -82,14 +82,14 @@ export default function PublicApostilas() {
                 Os materiais de estudo são exclusivos para inscritos. Informe seu CPF para acessar.
               </p>
             </div>
-            
+
             <form onSubmit={verifyCpf} className="p-6 space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   CPF do Inscrito
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   placeholder="000.000.000-00"
                   className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none text-lg text-center tracking-wider"
@@ -106,8 +106,8 @@ export default function PublicApostilas() {
                 </div>
               )}
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={loading || cpf.length < 14}
                 className="w-full bg-[#1e3a8a] text-white py-3.5 rounded-xl font-medium hover:bg-blue-800 transition-colors disabled:opacity-70 flex items-center justify-center space-x-2 text-lg shadow-sm"
               >
@@ -129,7 +129,7 @@ export default function PublicApostilas() {
                 <h2 className="text-2xl font-bold text-gray-900">Materiais de Estudo</h2>
                 <p className="text-gray-600 mt-1">Olá, <strong>{attendeeName}</strong>. Faça o download das apostilas e temas disponíveis.</p>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setIsVerified(false);
                   setCpf('');
@@ -142,36 +142,49 @@ export default function PublicApostilas() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {themes.map(theme => (
-                <div key={theme.id} className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col hover:shadow-lg transition-shadow">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`p-3 rounded-lg ${theme.file_type.includes('pdf') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                      {theme.file_type.includes('pdf') ? <FileText size={28} /> : <ImageIcon size={28} />}
+                <div key={theme.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col hover:shadow-lg transition-shadow">
+                  {/* Cover image or placeholder */}
+                  {theme.cover_image_url ? (
+                    <div className="h-44 overflow-hidden">
+                      <img
+                        src={theme.cover_image_url}
+                        alt={`Capa: ${theme.title}`}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
+                  ) : (
+                    <div className="h-44 bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+                      <div className={`p-4 rounded-xl ${theme.file_type?.includes('pdf') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                        {theme.file_type?.includes('pdf') ? <FileText size={36} /> : <ImageIcon size={36} />}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-5 flex flex-col flex-1">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">{theme.title}</h3>
+                    {theme.speaker && (
+                      <p className="text-sm text-gray-700 mb-1"><strong>Palestrante:</strong> {theme.speaker}</p>
+                    )}
+                    {theme.event_date && (
+                      <p className="text-sm text-gray-700 mb-1"><strong>Data:</strong> {new Date(theme.event_date).toLocaleDateString('pt-BR')}</p>
+                    )}
+                    <p className="text-sm text-gray-500 mb-6 mt-2">
+                      Disponibilizado em {new Date(theme.created_at).toLocaleDateString('pt-BR')}
+                    </p>
+
+                    <a
+                      href={theme.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-auto flex items-center justify-center space-x-2 w-full bg-[#1e3a8a] text-white py-3 rounded-lg hover:bg-blue-800 transition-colors font-medium"
+                    >
+                      <Download size={18} />
+                      <span>Baixar Arquivo</span>
+                    </a>
                   </div>
-                  
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">{theme.title}</h3>
-                  {theme.speaker && (
-                    <p className="text-sm text-gray-700 mb-1"><strong>Palestrante:</strong> {theme.speaker}</p>
-                  )}
-                  {theme.event_date && (
-                    <p className="text-sm text-gray-700 mb-1"><strong>Data:</strong> {new Date(theme.event_date).toLocaleDateString('pt-BR')}</p>
-                  )}
-                  <p className="text-sm text-gray-500 mb-6 mt-2">
-                    Disponibilizado em {new Date(theme.created_at).toLocaleDateString('pt-BR')}
-                  </p>
-                  
-                  <a 
-                    href={theme.file_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="mt-auto flex items-center justify-center space-x-2 w-full bg-[#1e3a8a] text-white py-3 rounded-lg hover:bg-blue-800 transition-colors font-medium"
-                  >
-                    <Download size={18} />
-                    <span>Baixar Arquivo</span>
-                  </a>
                 </div>
               ))}
-              
+
               {themes.length === 0 && (
                 <div className="col-span-full text-center py-16 bg-white rounded-xl border border-gray-200">
                   <Book size={48} className="mx-auto text-gray-300 mb-4" />

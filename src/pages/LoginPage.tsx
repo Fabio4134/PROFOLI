@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Lock, User } from 'lucide-react';
+import { Shield, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import api from '../lib/api';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const login = useAuthStore(state => state.login);
@@ -16,13 +17,23 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+
+    console.log('Tentativa de login:', { username: trimmedUsername, passwordLength: trimmedPassword.length });
+
     try {
-      const response = await api.post('/login', { username, password });
+      const response = await api.post('/login', {
+        username: trimmedUsername,
+        password: trimmedPassword
+      });
+      console.log('Login bem-sucedido:', response.data);
       login(response.data);
       navigate('/admin');
     } catch (err: any) {
-      setError('Credenciais inválidas. Tente novamente.');
+      console.error('Erro no login:', err.response?.data || err.message);
+      setError('Acesso negado. Usuário ou senha incorretos.');
     } finally {
       setLoading(false);
     }
@@ -40,14 +51,14 @@ export default function LoginPage() {
           <h2 className="text-2xl font-bold">Acesso Restrito</h2>
           <p className="text-blue-200 mt-2">Área administrativa do PROFOLI</p>
         </div>
-        
+
         <div className="p-8">
           {error && (
             <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-6 text-sm text-center">
               {error}
             </div>
           )}
-          
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
@@ -55,9 +66,9 @@ export default function LoginPage() {
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User size={18} className="text-gray-400" />
                 </div>
-                <input 
-                  type="text" 
-                  required 
+                <input
+                  type="text"
+                  required
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   value={username}
                   onChange={e => setUsername(e.target.value)}
@@ -72,26 +83,33 @@ export default function LoginPage() {
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock size={18} className="text-gray-400" />
                 </div>
-                <input 
-                  type="password" 
-                  required 
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={loading}
               className="w-full bg-[#1e3a8a] text-white py-3 rounded-lg font-medium hover:bg-blue-800 transition-colors disabled:opacity-70"
             >
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
-          
+
           <div className="mt-6 text-center">
             <a href="/" className="text-sm text-blue-600 hover:underline">Voltar para o site</a>
           </div>
