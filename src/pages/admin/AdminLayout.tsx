@@ -82,8 +82,8 @@ export default function AdminLayout() {
               to={item.path}
               onClick={() => setIsMobileMenuOpen(false)}
               className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${location.pathname === item.path
-                  ? 'bg-blue-800 text-white'
-                  : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'
+                ? 'bg-blue-800 text-white'
+                : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'
                 }`}
             >
               {item.icon}
@@ -112,7 +112,7 @@ export default function AdminLayout() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-[calc(100vh-60px)] md:h-screen overflow-hidden">
+      <main className="flex-1 flex flex-col h-[calc(100dvh-60px)] md:h-screen overflow-hidden">
         <header className="bg-white shadow-sm py-4 px-4 md:px-8 flex justify-between items-center shrink-0">
           <h2 className="text-lg md:text-xl font-semibold text-gray-800 truncate">
             {navItems.find(item => item.path === location.pathname)?.label || 'Painel'}
