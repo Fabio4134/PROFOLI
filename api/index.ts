@@ -43,17 +43,6 @@ app.post('/api/login', async (req, res) => {
     else res.status(401).json({ error: 'Invalid credentials' });
 });
 
-app.post('/api/reset-admin', async (req, res) => {
-    const { data, error } = await supabase
-        .from('users')
-        .upsert({ id: 1, username: 'admin', password: 'admin123', role: 'admin' }, { onConflict: 'username' })
-        .select()
-        .single();
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ message: 'Admin account reset successfully', user: data });
-});
-
 app.put('/api/users/:id', async (req, res) => {
     const { id } = req.params;
     const { username, password, currentPassword } = req.body;

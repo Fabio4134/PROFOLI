@@ -57,18 +57,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Temporary Reset Admin (for emergency access)
-app.post('/api/reset-admin', async (req, res) => {
-  const { data, error } = await supabase
-    .from('users')
-    .upsert({ id: 1, username: 'admin', password: 'admin123', role: 'admin' }, { onConflict: 'username' })
-    .select()
-    .single();
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ message: 'Admin account reset successfully', user: data });
-});
-
 // Update user credentials
 app.put('/api/users/:id', async (req, res) => {
   const { id } = req.params;
