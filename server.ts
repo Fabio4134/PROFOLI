@@ -1,0 +1,353 @@
+import express from 'express';
+import { createServer as createViteServer } from 'vite';
+import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import 'dotenv/config';
+import { supabase } from './src/db/index.ts';
+
+const app = express();
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+
+app.use(cors());
+app.use(express.json());
+
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+app.use('/uploads', express.static(uploadsDir));
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir)
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    cb(null, uniqueSuffix + path.extname(file.originalname))
+  }
+})
+const upload = multer({ storage: storage })
+
+// --- API ROUTES ---
+
+// Auth
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, username, role')
+    .eq('username', username)
+    .eq('password', password)
+    .single();
+
+  if (user) {
+    res.json(user);
+  } else {
+    res.status(401).json({ error: 'Invalid credentials' });
+  }
+});
+
+// Attendees
+app.get('/api/attendees', async (req, res) => {
+  const { data, error } = await supabase.from('attendees').select('*').order('name');
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+app.post('/api/attendees', async (req, res) => {
+  const { name, cpf, roles, church, phone } = req.body;
+  const { data, error } = await supabase
+    .from('attendees')
+    .insert([{ name, cpf, roles: JSON.stringify(roles), church, phone }])
+    .select('id')
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ id: data.id });
+});
+
+app.put('/api/attendees/:id', async (req, res) => {
+  const { name, cpf, roles, church, phone, status, payment_status } = req.body;
+  const { id } = req.params;
+  const { error } = await supabase
+    .from('attendees')
+    .update({ name, cpf, roles: JSON.stringify(roles), church, phone, status, payment_status })
+    .eq('id', id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+app.delete('/api/attendees/:id', async (req, res) => {
+  const { id } = req.params;
+
+  // Due to ON DELETE CASCADE on the tables, we only need to delete the attendee
+  const { error } = await supabase.from('attendees').delete().eq('id', id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// Public Attendee Status by CPF
+app.get('/api/public/status/:cpf', async (req, res) => {
+  const { cpf } = req.params;
+  const { data: attendee, error } = await supabase
+    .from('attendees')
+    .select('id, name, cpf, payment_status')
+    .eq('cpf', cpf)
+    .single();
+
+  if (attendee) {
+    res.json(attendee);
+  } else {
+    res.status(404).json({ error: 'Inscrito não encontrado' });
+  }
+});
+
+// Attendance
+app.get('/api/attendance', async (req, res) => {
+  const { date, theme_id } = req.query;
+  let query = supabase.from('attendance').select('*');
+
+  if (date) query = query.eq('date', date);
+  if (theme_id) query = query.eq('theme_id', theme_id);
+
+  const { data, error } = await query;
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+app.post('/api/attendance', async (req, res) => {
+  const { date, theme_id, records, finalized } = req.body;
+  try {
+    const upserts = records.map((record: any) => ({
+      attendee_id: record.attendee_id,
+      date,
+      theme_id,
+      present: record.present ? 1 : 0,
+      finalized: finalized ? 1 : 0
+    }));
+
+    // In Supabase, if we are doing upsert where conflicts occur, we need unique constraint.
+    // However, since we don't have constraints here besides Primary Key, we delete and reinsert.
+    for (const record of records) {
+      await supabase.from('attendance')
+        .delete()
+        .eq('attendee_id', record.attendee_id)
+        .eq('date', date)
+        .eq('theme_id', theme_id);
+    }
+
+    const { error } = await supabase.from('attendance').insert(upserts);
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Justifications
+app.get('/api/justifications', async (req, res) => {
+  const { data, error } = await supabase
+    .from('justifications')
+    .select(`
+      *,
+      attendees (name),
+      themes (title)
+    `)
+    .order('date', { ascending: false })
+    .order('id', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  const mapped = data.map((j: any) => ({
+    ...j,
+    attendee_name: j.attendees?.name,
+    theme_title: j.themes?.title
+  }));
+  res.json(mapped);
+});
+
+app.post('/api/justifications', async (req, res) => {
+  const { attendee_id, theme_id, date, reason } = req.body;
+  const { data, error } = await supabase
+    .from('justifications')
+    .insert([{ attendee_id, theme_id, date, reason }])
+    .select('id')
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ id: data.id });
+});
+
+app.delete('/api/justifications/:id', async (req, res) => {
+  const { id } = req.params;
+  const { error } = await supabase.from('justifications').delete().eq('id', id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// Financial
+app.get('/api/financial', async (req, res) => {
+  const { data, error } = await supabase
+    .from('financial_transactions')
+    .select(`
+      *,
+      attendees (name)
+    `)
+    .order('date', { ascending: false })
+    .order('id', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  const mapped = data.map((t: any) => ({
+    ...t,
+    attendee_name: t.attendees?.name
+  }));
+  res.json(mapped);
+});
+
+app.post('/api/financial', async (req, res) => {
+  const { type, category, amount, date, description, attendee_id, is_exempt } = req.body;
+
+  const { data, error } = await supabase
+    .from('financial_transactions')
+    .insert([{ type, category, amount, date, description, attendee_id: attendee_id || null }])
+    .select('id')
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+
+  // If it's an income linked to an attendee, update their payment status
+  if (type === 'income' && attendee_id) {
+    const status = is_exempt ? 'exempt' : 'paid';
+    await supabase.from('attendees').update({ payment_status: status }).eq('id', attendee_id);
+  }
+
+  res.json({ id: data.id });
+});
+
+app.delete('/api/financial/:id', async (req, res) => {
+  const { id } = req.params;
+  const { error } = await supabase.from('financial_transactions').delete().eq('id', id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// Themes
+app.get('/api/themes', async (req, res) => {
+  const { data, error } = await supabase.from('themes').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+app.post('/api/themes', upload.single('file'), async (req, res) => {
+  const { title, speaker, event_date, file_type, file_url } = req.body;
+
+  const { data, error } = await supabase
+    .from('themes')
+    .insert([{
+      title,
+      speaker,
+      event_date,
+      file_type,
+      file_url: req.file ? `/uploads/${req.file.filename}` : file_url
+    }])
+    .select('id')
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ id: data.id });
+});
+
+app.put('/api/themes/:id', async (req, res) => {
+  const { title, speaker, event_date, file_type, file_url } = req.body;
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .from('themes')
+    .update({ title, speaker, event_date, file_type, file_url })
+    .eq('id', id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+app.delete('/api/themes/:id', async (req, res) => {
+  const { id } = req.params;
+
+  // Get theme to delete file if exists
+  const { data: theme } = await supabase.from('themes').select('file_url').eq('id', id).single();
+
+  if (theme && theme.file_url && theme.file_url.startsWith('/uploads/')) {
+    const filePath = path.join(__dirname, theme.file_url);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+
+  const { error } = await supabase.from('themes').delete().eq('id', id);
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// Stats
+app.get('/api/stats', async (req, res) => {
+  try {
+    const { count: totalAttendees } = await supabase.from('attendees').select('*', { count: 'exact', head: true });
+    const { count: paidAttendees } = await supabase.from('attendees').select('*', { count: 'exact', head: true }).eq('payment_status', 'paid');
+
+    const { data: incomeData } = await supabase.from('financial_transactions').select('amount').eq('type', 'income');
+    const { data: expenseData } = await supabase.from('financial_transactions').select('amount').eq('type', 'expense');
+
+    const income = incomeData?.reduce((acc: number, item: any) => acc + item.amount, 0) || 0;
+    const expense = expenseData?.reduce((acc: number, item: any) => acc + item.amount, 0) || 0;
+
+    const { data: attendeesWithRoles } = await supabase.from('attendees').select('roles');
+    const roleCounts: Record<string, number> = {};
+
+    if (attendeesWithRoles) {
+      attendeesWithRoles.forEach((row: any) => {
+        try {
+          const roles = JSON.parse(row.roles);
+          if (Array.isArray(roles)) {
+            roles.forEach((r: string) => {
+              roleCounts[r] = (roleCounts[r] || 0) + 1;
+            });
+          }
+        } catch (e) { }
+      });
+    }
+
+    res.json({
+      totalAttendees: totalAttendees || 0,
+      paidAttendees: paidAttendees || 0,
+      totalIncome: income,
+      totalExpense: expense,
+      roleCounts
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static('dist'));
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();
